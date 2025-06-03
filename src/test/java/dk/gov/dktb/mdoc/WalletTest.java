@@ -1,0 +1,28 @@
+package dk.gov.dktb.mdoc;
+
+import dk.gov.dktb.mdoc.model.DeviceResponseExt;
+import dk.gov.dktb.mdoc.model.SessionTranscript;
+import dk.gov.dktb.mdoc.utilities.Base64Url;
+import lombok.SneakyThrows;
+import lombok.val;
+import org.junit.jupiter.api.Test;
+
+public class WalletTest {
+    @Test
+    @SneakyThrows
+    public void testWallet() {
+        val vpToken = "o2ZzdGF0dXMAZ3ZlcnNpb25jMS4waWRvY3VtZW50c4GjZ2RvY1R5cGV4KWV1LmV1cm9wYS5lYy5ldWRpLnBzZXVkb255bS5hZ2Vfb3Zlcl8xOC4xbGRldmljZVNpZ25lZKJqZGV2aWNlQXV0aKFvZGV2aWNlU2lnbmF0dXJl0oRDoQEmoFiX2BhYk4R0RGV2aWNlQXV0aGVudGljYXRpb26D9vaDWCAJ54TaW-jEJMRorQNqMSexA5YbSvDADvAwyQbSDxZaR1ggPURukyoWyoKUYMIQbH-Vsz3Y9u2LGonGuDKTFdNEDhVlbm9uY2V4KWV1LmV1cm9wYS5lYy5ldWRpLnBzZXVkb255bS5hZ2Vfb3Zlcl8xOC4x2BhBoFhA-Mnub22moQ4Tp-dQniPnwYpGHSMzfT6GQKUUVwxele_GgGyHQUgdDHbFcnXuE8Cu3EN8hJ-FQEc7LYyht5vFVWpuYW1lU3BhY2Vz2BhBoGxpc3N1ZXJTaWduZWSiamlzc3VlckF1dGiEQ6EBJqEYIVkBKjCCASYwgc2gAwIBAgIJAMWUH8uwJloXMAoGCCqGSM49BAMCMA0xCzAJBgNVBAMMAkNBMB4XDTI0MDkxNzE0MDY1M1oXDTM0MDkxNzE0MDY1M1owETEPMA0GA1UEAwwGSXNzdWVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGw7Dfpfd-wl4ejog_Xx4fNEvxl-NmHRV16A7pSHpHhRO6JKiK9Y3enEQBCpfl0ZhOmMjyLZOchuO_ktgNYRDS6MSMBAwDgYDVR0PAQH_BAQDAgbAMAoGCCqGSM49BAMCA0gAMEUCICd3BXtlOtgsf4yQyEcgp9nK5MHoEIbafneafxIZyoxDAiEA4UKPkD_yztasUpiMHwjQ3FFsYowZOmkMEwHbOWAB32ZZAbfYGFkBsqZnZG9jVHlwZXgpZXUuZXVyb3BhLmVjLmV1ZGkucHNldWRvbnltLmFnZV9vdmVyXzE4LjFndmVyc2lvbmMxLjBsdmFsaWRpdHlJbmZvo2ZzaWduZWTAdDIwMjUtMDUtMjhUMTI6MTM6NDNaaXZhbGlkRnJvbcB0MjAyNS0wNS0yOFQxMjoxMzo0M1pqdmFsaWRVbnRpbMB0MjAyNS0wOC0yNlQxMjoxMzo0M1psdmFsdWVEaWdlc3RzoXgpZXUuZXVyb3BhLmVjLmV1ZGkucHNldWRvbnltLmFnZV9vdmVyXzE4LjGiGm_u4fFYICkTYAVOX2c8b97gSodEPk8e80lKcJ7xH16Yxvd0-sqEGnC5JZFYIG0JV1iTvWM1RIlLWwd6gQ510q5MuCexQV_CYuVjFLeZbWRldmljZUtleUluZm-haWRldmljZUtleaUBAgMmIAEhWCC0xVfUgOs1U8CozVemtYfJKH95NnCWQFJPQ_9U4xD7tSJYIBcv7-0qBq7UbimF5WYExvmbPyDKn8BUl1FDDhJWrWi1b2RpZ2VzdEFsZ29yaXRobWdTSEEtMjU2WECl7OKeiU4J8ab39mR7FADGNkXAdrt3H0Zpf99zPxBTdMmBLDoSYjVgBbJqw3--YVy7HLlF54itBr-wPF8kma8_am5hbWVTcGFjZXOheClldS5ldXJvcGEuZWMuZXVkaS5wc2V1ZG9ueW0uYWdlX292ZXJfMTguMYHYGFhkpGZyYW5kb21YIGurgl5w5ekHaOO4ZQsujyYz3Z3l6ZVspa5UnPAdgN8ZaGRpZ2VzdElEGm_u4fFsZWxlbWVudFZhbHVl9XFlbGVtZW50SWRlbnRpZmllcmthZ2Vfb3Zlcl8xOA";
+        val mdocNonce = "hQUmE4m-r5PRefxM4Afvbw";
+        val nonce = "nonce";
+        val clientId = "clientId";
+        val responseUrl = "responseUrl";
+
+        var transcript = SessionTranscript.forOid4VP(clientId, responseUrl, nonce, mdocNonce);
+
+        val deviceResponse = DeviceResponseExt.from(Base64Url.decode(vpToken));
+        val document = deviceResponse.getDocument(0);
+        document.getIssuerSigned().assertSignatureValid();
+        document.assertSignatureValid(transcript);
+    }
+
+}
