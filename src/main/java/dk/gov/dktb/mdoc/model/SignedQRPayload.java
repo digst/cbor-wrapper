@@ -1,7 +1,6 @@
 package dk.gov.dktb.mdoc.model;
 
 import com.authlete.cbor.CBORParser;
-import dk.gov.dktb.mdoc.utilities.Base64Url;
 import lombok.Setter;
 import lombok.SneakyThrows;
 
@@ -9,6 +8,9 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /// Signed QR payload:
@@ -21,7 +23,26 @@ import java.util.Map;
 ///   "d": bstr         ; CBOR encoding of Document
 ///}
 ///```
+///
+/// Multiple parts:
+///
+/// ```
+/// PartialQRPayload = {
+///   "i": uint,          ; Number of this part
+///   "n": uint,          ; Number of parts in total
+///   "p": bstr           ; Part p_i
+///}
+///```
 public class SignedQRPayload {
+    public static final String MDOC_GENERATED_NONCE_LABEL = "m";
+    public static final String VALID_FROM_LABEL = "f";
+    public static final String VALID_TO_LABEL = "t";
+    public static final String DOCUMENT_LABEL = "d";
+    public static final String CURRENT_PART_LABEL = "i";
+    public static final String NUMBER_OF_PARTS_LABEL = "n";
+    public static final String PART_LABEL = "p";
+
+
     private final String mdocGeneratedNonce;
     private final Instant validFrom;
     private final Instant validTo;
@@ -42,20 +63,57 @@ public class SignedQRPayload {
     @Setter
     private Duration allowedClockSkew = Duration.ofSeconds(60);
 
+    /**
+     * Construct from single QR payload
+     *
+     * @param payload data from QR code
+     */
     @SneakyThrows
-    public SignedQRPayload(String qrData) {
-        final byte[] decoded = Base64Url.decode(qrData);
-        final var map = asMap(decoded);
+    public SignedQRPayload(byte[] payload) {
+        final var map = asMap(payload);
 
-        mdocGeneratedNonce = (String) map.get("m");
-        validFrom = asEpochSecond(map.get("f"));
-        validTo = asEpochSecond(map.get("t"));
-        document = DocumentExt.from(asMap((byte[]) map.get("d")));
+        mdocGeneratedNonce = (String) map.get(MDOC_GENERATED_NONCE_LABEL);
+        validFrom = asEpochSecond(map.get(VALID_FROM_LABEL));
+        validTo = asEpochSecond(map.get(VALID_TO_LABEL));
+        document = DocumentExt.from(asMap((byte[]) map.get(DOCUMENT_LABEL)));
 
         if (!validTo.isAfter(validFrom)) {
             throw new IllegalArgumentException("ValidFrom is after validTo");
         }
     }
+
+    @SneakyThrows
+    public static SignedQRPayload fromMultipleParts(List<byte[]> payloads) {
+        var count = payloads.size();
+        var parts = new ArrayList<byte[]>(Collections.nCopies(count, null));
+        for (byte[] payload : payloads) {
+            final var map = asMap(payload);
+            var i = (Integer) map.get(CURRENT_PART_LABEL);
+            if (i < 0 || i >= count) {
+                throw new IllegalArgumentException("Invalid part number: " + i);
+            }
+            var n = (Integer) map.get(NUMBER_OF_PARTS_LABEL);
+            if (n != count) {
+                throw new IllegalArgumentException("Number of parts (n) in CBOR structure must be the same as the number of parts passed to constructor.");
+            }
+            var p = (byte[]) map.get(PART_LABEL);
+            parts.set(i, p);
+        }
+        return new SignedQRPayload(concatenate(parts));
+    }
+
+    public static byte[] concatenate(List<byte[]> arrays) {
+        var totalLength = arrays.stream().mapToInt(array -> array.length).sum();
+
+        var result = new byte[totalLength];
+        int currentPos = 0;
+        for (byte[] array : arrays) {
+            System.arraycopy(array, 0, result, currentPos, array.length);
+            currentPos += array.length;
+        }
+        return result;
+    }
+
 
     private static Map<String, Object> asMap(byte[] decoded) throws IOException {
         var parser = new CBORParser(decoded);
