@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public class Base64Url {
-    public static String encode(byte [] bytes) {
+    public static String encode(byte[] bytes) {
         return new String(Base64.getUrlEncoder().encode(bytes), StandardCharsets.UTF_8);
     }
 

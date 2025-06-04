@@ -2,9 +2,11 @@ package dk.gov.dktb.mdoc.model;
 
 import com.authlete.cbor.CBORParser;
 import dk.gov.dktb.mdoc.utilities.Base64Url;
+import lombok.Setter;
 import lombok.SneakyThrows;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -25,6 +27,21 @@ public class SignedQRPayload {
     private final Instant validTo;
     private final DocumentExt document;
 
+    @Setter
+    private Clock clock = Clock.systemUTC();
+
+    /**
+     * Signed QR temporal validity period is not allowed to exceed this value
+     */
+    @Setter
+    private Duration maxAllowedTimeToLive = Duration.ofSeconds(190);
+
+    /**
+     * Temporal validation allows for a clock skew up to this value
+     */
+    @Setter
+    private Duration allowedClockSkew = Duration.ofSeconds(60);
+
     @SneakyThrows
     public SignedQRPayload(String qrData) {
         final byte[] decoded = Base64Url.decode(qrData);
@@ -35,14 +52,19 @@ public class SignedQRPayload {
         validTo = asEpochSecond(map.get("t"));
         document = DocumentExt.from(asMap((byte[]) map.get("d")));
 
-        if(!validTo.isAfter(validFrom)) {
+        if (!validTo.isAfter(validFrom)) {
             throw new IllegalArgumentException("ValidFrom is after validTo");
         }
     }
 
     private static Map<String, Object> asMap(byte[] decoded) throws IOException {
         var parser = new CBORParser(decoded);
-        return (Map<String, Object>) parser.next();
+        final Object next = parser.next();
+        if (!(next instanceof Map)) {
+            throw new IllegalArgumentException("Expected a Map, but got " + next.getClass().getSimpleName());
+        }
+        //noinspection unchecked
+        return (Map<String, Object>) next;
     }
 
     private static Instant asEpochSecond(Object value) {
@@ -55,29 +77,31 @@ public class SignedQRPayload {
         }
     }
 
-    public void assertNotExpiredOrNotYetValid(Duration allowedClockSkew) {
+    public void assertNotExpiredOrNotYetValid() {
         if (allowedClockSkew.isNegative()) throw new IllegalArgumentException("The clock skew cannot be negative");
         var skewSeconds = allowedClockSkew.getSeconds();
-        var now = Instant.now();
-        var expiresAt = validTo.plusSeconds(skewSeconds);
-        if (now.isAfter(expiresAt)) {
+        var now = clock.instant();
+
+        var validToWithSkew = validTo.plusSeconds(skewSeconds);
+        if (now.isAfter(validToWithSkew)) {
             throw new SecurityException("QR code has expired at " + validTo);
         }
-        var validAt = validFrom.minusSeconds(skewSeconds);
-        if (now.isBefore(validAt)) {
+
+        var validFromWithSkew = validFrom.minusSeconds(skewSeconds);
+        if (now.isBefore(validFromWithSkew)) {
             throw new SecurityException("QR code is not valid until " + validFrom);
         }
     }
 
-    public void assertTimeToLiveValid(Duration timeToLive) {
-        if (validTo.minus(timeToLive).isAfter(validFrom)) {
-            throw new SecurityException("QR code lifetime is longer than " + timeToLive.getSeconds() + " seconds");
+    public void assertTimeToLiveValid() {
+        if (validTo.minus(maxAllowedTimeToLive).isAfter(validFrom)) {
+            throw new SecurityException("QR code lifetime is longer than " + maxAllowedTimeToLive.getSeconds() + " seconds");
         }
     }
 
     public void assertValid() {
-        assertTimeToLiveValid(Duration.ofSeconds(190));
-        assertNotExpiredOrNotYetValid(Duration.ofSeconds(60));
+        assertTimeToLiveValid();
+        assertNotExpiredOrNotYetValid();
         assertDeviceSignatureValid();
     }
 
