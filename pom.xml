@@ -4,7 +4,7 @@
 
     <groupId>dk.gov.dktb</groupId>
     <artifactId>cbor-wrapper</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>999-SNAPSHOT</version> <!-- jgitver used for versioning. -->
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
